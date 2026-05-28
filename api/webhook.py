@@ -1,6 +1,7 @@
 import json
 import os
-import httpx
+import urllib.request
+import urllib.error
 
 # Config
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
@@ -54,15 +55,26 @@ def analyze_scam(text: str, lang: str = "en") -> str:
         "Authorization": f"Bearer {LLM_API_KEY}",
     }
 
-    response = httpx.post(LLM_ENDPOINT, json=payload, headers=headers, timeout=30)
-    response.raise_for_status()
-    data = response.json()
+    req = urllib.request.Request(LLM_ENDPOINT, data=json.dumps(payload).encode(), headers=headers, method="POST")
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read().decode())
 
     if "choices" in data:
         return data["choices"][0]["message"]["content"]
     if "message" in data:
         return data["message"].get("content", str(data))
     return str(data)
+
+
+def _post_json(url, payload):
+    """Helper to POST JSON using urllib."""
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.read()
+    except urllib.error.URLError:
+        pass
 
 
 def send_message(chat_id, text, reply_markup=None):
@@ -73,23 +85,23 @@ def send_message(chat_id, text, reply_markup=None):
         "parse_mode": "Markdown",
     }
     if reply_markup:
-        payload["reply_markup"] = json.dumps(reply_markup)
-    httpx.post(url, json=payload, timeout=10)
+        payload["reply_markup"] = reply_markup
+    _post_json(url, payload)
 
 
 def send_chat_action(chat_id, action="typing"):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendChatAction"
-    httpx.post(url, json={"chat_id": chat_id, "action": action}, timeout=5)
+    _post_json(url, {"chat_id": chat_id, "action": action})
 
 
 def answer_callback(callback_query_id, text=""):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/answerCallbackQuery"
-    httpx.post(url, json={"callback_query_id": callback_query_id, "text": text}, timeout=5)
+    _post_json(url, {"callback_query_id": callback_query_id, "text": text})
 
 
 def edit_message(chat_id, message_id, text):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/editMessageText"
-    httpx.post(url, json={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"}, timeout=5)
+    _post_json(url, {"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"})
 
 
 from http.server import BaseHTTPRequestHandler
