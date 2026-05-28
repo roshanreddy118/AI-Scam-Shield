@@ -1,7 +1,2 @@
 {
-  "functions": {
-    "api/webhook.py": {
-      "maxDuration": 30
-    }
-  }
 }
