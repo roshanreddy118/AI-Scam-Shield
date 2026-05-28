@@ -92,13 +92,28 @@ def edit_message(chat_id, message_id, text):
     httpx.post(url, json={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"}, timeout=5)
 
 
-def handler(request):
-    """Vercel serverless function handler."""
-    if request.method == "GET":
-        return "AI Scam Shield is running!"
+from http.server import BaseHTTPRequestHandler
 
-    body = request.body.decode("utf-8")
-    update = json.loads(body)
+
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write("AI Scam Shield is running!".encode())
+
+    def do_POST(self):
+        content_length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(content_length).decode("utf-8")
+        update = json.loads(body)
+        process_update(update)
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write("ok".encode())
+
+
+def process_update(update):
 
     # Handle callback queries (language selection)
     if "callback_query" in update:
